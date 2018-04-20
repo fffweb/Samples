@@ -4,7 +4,7 @@ namespace TradeOdata.Tickers
 {
     public class Future
     {
-        private double _price;
+        private decimal _price;
 
         public string Symbol { get; set; }
 
@@ -19,25 +19,25 @@ namespace TradeOdata.Tickers
 
         public decimal ClosePrice { get; set; }
 
-        public decimal HighestPrice { get; set; }
+        //public decimal HighestPrice { get; set; }
 
         public string InstrumentID { get; set; }
 
-        public decimal LastPrice { get; set; }
+        //public decimal LastPrice { get; set; }
 
         public decimal LowerLimitPrice { get; set; }
 
-        public decimal LowestPrice { get; set; }
+        //public decimal LowestPrice { get; set; }
 
-        public int OpenInterest { get; set; }
-        
-        public decimal OpenPrice { get; private set; }
+        public double OpenInterest { get; set; }
+
+        //public decimal OpenPrice { get; private set; }
 
         public decimal PreClosePrice { get; set; }
 
         public decimal PreDelta { get; set; }
 
-        public int PreOpenInterest { get; set; }
+        public double PreOpenInterest { get; set; }
 
         public decimal PreSettlementPrice { get; set; }
 
@@ -45,7 +45,7 @@ namespace TradeOdata.Tickers
 
         public string TradingDay { get; set; }
 
-        public int Turnover { get; set; }
+        public decimal Turnover { get; set; }
 
         public int UpdateMillisec { get; set; }
 
@@ -55,19 +55,19 @@ namespace TradeOdata.Tickers
 
         public int Volume { get; set; }
 
-        public double DayLow { get;  set; }
-        
-        public double DayHigh { get;  set; }
+        public decimal LowestPrice { get; set; }
 
-        public double LastChange { get; private set; }
+        public decimal HighestPrice { get; set; }
 
-        public double DayOpen { get;  set; }
+        public decimal LastChange { get; private set; }
 
-        public double Change
+        public decimal OpenPrice { get; set; }
+
+        public decimal Change
         {
             get
             {
-                return Price - DayOpen;
+                return LastPrice - OpenPrice;
             }
         }
 
@@ -75,11 +75,11 @@ namespace TradeOdata.Tickers
         {
             get
             {
-                return (double)Math.Round(Change / Price, 4);
+                return LastPrice == 0 ? 0 : (double)Math.Round(Change / LastPrice, 4);
             }
         }
 
-        public Double Price
+        public decimal LastPrice
         {
             get
             {
@@ -95,17 +95,17 @@ namespace TradeOdata.Tickers
                 LastChange = value - _price;
                 _price = value;
 
-                if (DayOpen == 0)
+                if (OpenPrice == 0)
                 {
-                    DayOpen = _price;
+                    OpenPrice = _price;
                 }
-                if (_price < DayLow || DayLow == 0)
+                if (_price < LowestPrice || LowestPrice == 0)
                 {
-                    DayLow = _price;
+                    LowestPrice = _price;
                 }
-                if (_price > DayHigh)
+                if (_price > HighestPrice)
                 {
-                    DayHigh = _price;
+                    HighestPrice = _price;
                 }
             }
         }
@@ -137,10 +137,10 @@ namespace TradeOdata.Tickers
         //        {
         //            return;
         //        }
-                
+
         //        LastChange = value - _price;
         //        _price = value;
-                
+
         //        if (OpenPrice == 0)
         //        {
         //            OpenPrice = _price;
