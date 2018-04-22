@@ -138,14 +138,35 @@ namespace RtdClock_ExcelRtdServer
             var hubConnection = new HubConnection("http://localhost:52842");// ("http://www.wmleo.cc/");
             //var hubConnection = new HubConnection("http://www.wmleo.cc/");
             IHubProxy stockTickerHubProxy = hubConnection.CreateHubProxy("ctpQuantTicker");
-            stockTickerHubProxy.On<Future>("UpdateFuturePrice", stock =>
+            stockTickerHubProxy.On<Future>("UpdateFuturePrice", future =>
             {
-                Console.WriteLine("Future update for {0} new price {1}", stock.Symbol, stock.LastPrice);
+                Console.WriteLine("Future update for {0} new price {1}", future.Symbol, future.LastPrice);
                 foreach (var topic in _topics)
                 {
-                    if (topic._symbol == stock.Symbol)//&& topic._type=="Price" && stock.Price != (double)topic.Value)
+                    if (topic._symbol == future.Symbol)//&& topic._type=="Price" && stock.Price != (double)topic.Value)
                     {
-                        topic.UpdateValue(stock.LastPrice);
+                        //topic.UpdateValue(future.LastPrice);
+
+                        if (topic._type == "Last" && !(IsNumericType(topic.Value.GetType()) && Convert.ToDecimal(topic.Value) == future.LastPrice))
+                        //if (!(Convert.ToDecimal(topic.Value) == future.LastPrice))
+                        {
+                            topic.UpdateValue(future.LastPrice);
+                        }
+                        if (topic._type == "Open" && !(IsNumericType(topic.Value.GetType()) && Convert.ToDecimal(topic.Value) == future.OpenPrice))
+                        //if (!(Convert.ToDecimal(topic.Value) == future.LastPrice))
+                        {
+                            topic.UpdateValue(future.OpenPrice);
+                        }
+                        if (topic._type == "High" && !(IsNumericType(topic.Value.GetType()) && Convert.ToDecimal(topic.Value) == future.HighestPrice))
+                        //if (!(Convert.ToDecimal(topic.Value) == future.LastPrice))
+                        {
+                            topic.UpdateValue(future.HighestPrice);
+                        }
+                        if (topic._type == "Low" && !(IsNumericType(topic.Value.GetType()) && Convert.ToDecimal(topic.Value) == future.LowestPrice))
+                        //if (!(Convert.ToDecimal(topic.Value) == future.LastPrice))
+                        {
+                            topic.UpdateValue(future.LowestPrice);
+                        }
                     }
 
                     //PropertyInfo[] properties = typeof(Record).GetProperties();
