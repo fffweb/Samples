@@ -30,7 +30,7 @@ namespace RtdClock_ExcelRtdServer
         // (normally that would be dangeours for an RTD server, but ExcelRtdServer is thrad-safe)
         Timer _timer;
         List<QuoteTopic> _topics;
-
+        HubConnection _hubConnection;
         //Dictionary<string, List<QuoteTopic>> _symbolTopics;
 
         private void loadStringMap()
@@ -47,12 +47,16 @@ namespace RtdClock_ExcelRtdServer
             //_timer = new Timer(timer_tick, null, 0, 1000);
             _topics = new List<QuoteTopic>();
             //_symbolTopics = new Dictionary<string, List<QuoteTopic>>();
-            getCtpticks();
+            //getCtpticks();
             return true;
         }
 
         protected override void ServerTerminate()
         {
+            if(_hubConnection != null)
+            {
+                _hubConnection.Dispose();
+            }
             if (_timer != null)
             {
                 _timer.Dispose();
@@ -63,6 +67,15 @@ namespace RtdClock_ExcelRtdServer
         {
             QuoteTopic topic1 = (QuoteTopic)topic;
             _topics.Add(topic1);
+            if (topic1._symbol == "Server")
+            {
+                if (_hubConnection!=null)
+                {
+                    _hubConnection.Dispose();
+                }
+                getCtpticks(topic1._type);
+                return topic1._type;
+            }
             //topic1.UpdateValue(0);
             //List<QuoteTopic> topicsForSymbol;
             //if (_symbolTopics.TryGetValue(topic1._symbol, out topicsForSymbol))
@@ -133,11 +146,12 @@ namespace RtdClock_ExcelRtdServer
                     return false;
             }
         }
-        private async void getCtpticks()
+        private async void getCtpticks(string url)
         {
-            var hubConnection = new HubConnection("http://localhost:52842");// ("http://www.wmleo.cc/");
+            //_hubConnection = new HubConnection("http://localhost:52842");// ("http://www.wmleo.cc/");
             //var hubConnection = new HubConnection("http://www.wmleo.cc/");
-            IHubProxy stockTickerHubProxy = hubConnection.CreateHubProxy("ctpQuantTicker");
+            _hubConnection = new HubConnection(url);
+            IHubProxy stockTickerHubProxy = _hubConnection.CreateHubProxy("ctpQuantTicker");
             stockTickerHubProxy.On<Future>("UpdateFuturePrice", future =>
             {
                 Console.WriteLine("Future update for {0} new price {1}", future.Symbol, future.LastPrice);
@@ -166,6 +180,17 @@ namespace RtdClock_ExcelRtdServer
                         //if (!(Convert.ToDecimal(topic.Value) == future.LastPrice))
                         {
                             topic.UpdateValue(future.LowestPrice);
+                        }
+
+                        if (topic._type == "SettlementPrice" && !(IsNumericType(topic.Value.GetType()) && Convert.ToDecimal(topic.Value) == future.SettlementPrice))
+                        //if (!(Convert.ToDecimal(topic.Value) == future.LastPrice))
+                        {
+                            topic.UpdateValue(future.SettlementPrice);
+                        }
+                        if (topic._type == "PreSettlementPrice" && !(IsNumericType(topic.Value.GetType()) && Convert.ToDecimal(topic.Value) == future.PreSettlementPrice))
+                        //if (!(Convert.ToDecimal(topic.Value) == future.LastPrice))
+                        {
+                            topic.UpdateValue(future.PreSettlementPrice);
                         }
                     }
 
@@ -225,7 +250,7 @@ namespace RtdClock_ExcelRtdServer
                 //}
 
             });
-            await hubConnection.Start();
+            await _hubConnection.Start();
         }
 
         public static T? ConvertTo<T>(object x) where T : struct
