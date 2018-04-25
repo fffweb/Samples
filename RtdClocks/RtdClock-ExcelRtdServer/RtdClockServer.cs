@@ -5,6 +5,7 @@ using System.Threading;
 using ExcelDna.Integration.Rtd;
 using Microsoft.AspNet.SignalR.Client;
 using TradeOdata.Tickers;
+using System.Threading.Tasks;
 
 namespace RtdClock_ExcelRtdServer
 {
@@ -33,6 +34,11 @@ namespace RtdClock_ExcelRtdServer
         HubConnection _hubConnection;
         //Dictionary<string, List<QuoteTopic>> _symbolTopics;
 
+        public RtdClockServer():base()
+        {
+
+        }
+
         private void loadStringMap()
         {
             String[] excel_types = new String[] { "Symbol", "Open" };
@@ -53,7 +59,7 @@ namespace RtdClock_ExcelRtdServer
 
         protected override void ServerTerminate()
         {
-            if(_hubConnection != null)
+            if (_hubConnection != null)
             {
                 _hubConnection.Dispose();
             }
@@ -69,11 +75,22 @@ namespace RtdClock_ExcelRtdServer
             _topics.Add(topic1);
             if (topic1._symbol == "Server")
             {
-                if (_hubConnection!=null)
+                if (_hubConnection != null)
                 {
                     _hubConnection.Dispose();
                 }
-                getCtpticks(topic1._type);
+                try
+                {
+                    var task = getCtpticks(topic1._type);
+                    task.Wait();
+                }
+                catch (Exception e)
+                {
+
+                    //throw;
+                    return e.Message;
+                }
+                
                 return topic1._type;
             }
             //topic1.UpdateValue(0);
@@ -109,10 +126,45 @@ namespace RtdClock_ExcelRtdServer
             //    }
             //}
         }
+        private string getCTPSymbol(string symbol)
+        {
+            if (symbol == "Server")
+                return symbol;
+            string FirstTwoLetter = symbol.Substring(0, 2);
+            if (FirstTwoLetter == "AP" ||
+                    FirstTwoLetter == "CF" ||
+                    FirstTwoLetter == "FG" ||
+                    FirstTwoLetter == "MA" ||
+                    FirstTwoLetter == "OI" ||
+                    FirstTwoLetter == "RM" ||
+                    FirstTwoLetter == "SF" ||
+                    FirstTwoLetter == "SM" ||
+                    FirstTwoLetter == "SR" ||
+                    FirstTwoLetter == "TA" ||
+                    FirstTwoLetter == "ZC")
+            {
+                if (symbol.Length == 6) { 
+                    //remove digit ,like FG1809=>FG809
+                    return symbol.Remove(2, 1);
+                }
+                else { 
+                    //already ctp type symbol, no need to remove 
+                    return symbol;
+                }
+            }
 
+            if (FirstTwoLetter != "IC" && FirstTwoLetter != "IH" && FirstTwoLetter != "IF" && FirstTwoLetter != "TF" && FirstTwoLetter != "T1")
+            {
+                //all dce and shfe is lowcase.
+                return symbol.ToLower();
+            }
+
+
+            return symbol;
+        }
         protected override Topic CreateTopic(int topicId, IList<string> topicInfo)
         {
-            return new QuoteTopic(this, topicId) { _symbol = topicInfo[0], _type = topicInfo[1] };
+            return new QuoteTopic(this, topicId) { _symbol = getCTPSymbol(topicInfo[0]), _type = topicInfo[1] };
         }
 
         void timer_tick(object _unused_state_)
@@ -146,14 +198,29 @@ namespace RtdClock_ExcelRtdServer
                     return false;
             }
         }
-        private async void getCtpticks(string url)
+        public async Task getCtpticks(string url)
         {
+            //try
+            {
+
+            
             //_hubConnection = new HubConnection("http://localhost:52842");// ("http://www.wmleo.cc/");
             //var hubConnection = new HubConnection("http://www.wmleo.cc/");
             _hubConnection = new HubConnection(url);
             IHubProxy stockTickerHubProxy = _hubConnection.CreateHubProxy("ctpQuantTicker");
-            stockTickerHubProxy.On<Future>("UpdateFuturePrice", future =>
+            stockTickerHubProxy.On<Future>("UpdateFuturePrice", updateTopic);
+            await _hubConnection.Start();
+            }
+            //catch (Exception e)
             {
+
+                //throw;
+            }
+        }
+
+        private void updateTopic(Future future)
+        {
+            
                 Console.WriteLine("Future update for {0} new price {1}", future.Symbol, future.LastPrice);
                 foreach (var topic in _topics)
                 {
@@ -213,7 +280,7 @@ namespace RtdClock_ExcelRtdServer
 
                 //   //if (!(IsNumericType(topic.Value.GetType()) && Convert.ToDecimal(topic.Value)==stock.LastPrice) )
                 //    {
-                        
+
                 //        topic.UpdateValue(stock.LastPrice);
                 //    }
                 //    //decimal? tmpvalue = ConvertTo<Decimal>(topic.Value);
@@ -249,8 +316,7 @@ namespace RtdClock_ExcelRtdServer
                 //    }
                 //}
 
-            });
-            await _hubConnection.Start();
+            
         }
 
         public static T? ConvertTo<T>(object x) where T : struct
