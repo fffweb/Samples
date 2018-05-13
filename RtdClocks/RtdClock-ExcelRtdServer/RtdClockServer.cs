@@ -32,9 +32,13 @@ namespace RtdClock_ExcelRtdServer
         Timer _timer;
         List<QuoteTopic> _topics;
         HubConnection _hubConnection;
+        QuoteTopic _stateTopic;
+        string _urlServer;
+        private bool _isServerClose=false;
+
         //Dictionary<string, List<QuoteTopic>> _symbolTopics;
 
-        public RtdClockServer():base()
+        public RtdClockServer() : base()
         {
 
         }
@@ -61,6 +65,7 @@ namespace RtdClock_ExcelRtdServer
         {
             if (_hubConnection != null)
             {
+                _isServerClose = true;
                 _hubConnection.Dispose();
             }
             if (_timer != null)
@@ -81,6 +86,7 @@ namespace RtdClock_ExcelRtdServer
                 }
                 try
                 {
+                    _urlServer = topic1._type;
                     var task = getCtpticks(topic1._type);
                     task.Wait();
                 }
@@ -90,7 +96,7 @@ namespace RtdClock_ExcelRtdServer
                     //throw;
                     return e.Message;
                 }
-                
+                _stateTopic = topic1;
                 return topic1._type;
             }
             //topic1.UpdateValue(0);
@@ -143,11 +149,13 @@ namespace RtdClock_ExcelRtdServer
                     FirstTwoLetter == "TA" ||
                     FirstTwoLetter == "ZC")
             {
-                if (symbol.Length == 6) { 
+                if (symbol.Length == 6)
+                {
                     //remove digit ,like FG1809=>FG809
                     return symbol.Remove(2, 1);
                 }
-                else { 
+                else
+                {
                     //already ctp type symbol, no need to remove 
                     return symbol;
                 }
@@ -198,29 +206,82 @@ namespace RtdClock_ExcelRtdServer
                     return false;
             }
         }
-        public async Task getCtpticks(string url)
+        public async Task<bool> getCtpticks(string url)
         {
-            //try
+            bool connected=false;
+            try
             {
 
-            
-            //_hubConnection = new HubConnection("http://localhost:52842");// ("http://www.wmleo.cc/");
-            //var hubConnection = new HubConnection("http://www.wmleo.cc/");
-            _hubConnection = new HubConnection(url);
-            IHubProxy stockTickerHubProxy = _hubConnection.CreateHubProxy("ctpQuantTicker");
-            stockTickerHubProxy.On<Future>("UpdateFuturePrice", updateTopic);
-            await _hubConnection.Start();
+
+                //_hubConnection = new HubConnection("http://localhost:52842");// ("http://www.wmleo.cc/");
+                //var hubConnection = new HubConnection("http://www.wmleo.cc/");
+                _hubConnection = new HubConnection(url);
+ 
+
+                IHubProxy stockTickerHubProxy = _hubConnection.CreateHubProxy("ctpQuantTicker");
+                stockTickerHubProxy.On<Future>("UpdateFuturePrice", updateTopic);
+                await _hubConnection.Start();
+                if (_hubConnection.State == ConnectionState.Connected)
+                {
+                    connected = true;
+                    _hubConnection.ConnectionSlow += () =>
+                    {
+                        Console.WriteLine("Connection problems.");
+                        _stateTopic.UpdateValue(DateTime.Now + " ConnectionSlow|" + _stateTopic.Value);
+                    };
+                    _hubConnection.Closed += async () =>
+                    {
+                        Console.WriteLine("Connection closed.");
+                        _stateTopic.UpdateValue(DateTime.Now + "Closed|" + _stateTopic.Value);
+
+                        if (!_isServerClose) // A global variable being set in "Form_closing" event of Form, check if form not closed explicitly to prevent a possible deadlock.
+                        {
+                            // specify a retry duration
+                            TimeSpan retryDuration = TimeSpan.FromSeconds(30);
+
+                            while (DateTime.UtcNow < DateTime.UtcNow.Add(retryDuration))
+                            {
+                                bool connected1 = await getCtpticks(_urlServer);
+                                if (connected1)
+                                    return;
+                            }
+                            Console.WriteLine("Connection closed");
+                        }
+
+                    };                    
+                }
+
+                return connected;
             }
-            //catch (Exception e)
+            catch (Exception e)
             {
-
+                return false;
                 //throw;
             }
         }
 
+        //private async void Connection_Closed()
+        //{
+        //    if (!IsFormClosed) // A global variable being set in "Form_closing" event of Form, check if form not closed explicitly to prevent a possible deadlock.
+        //    {
+        //        // specify a retry duration
+        //        TimeSpan retryDuration = TimeSpan.FromSeconds(30);
+
+        //        while (DateTime.UtcNow < DateTime.UtcNow.Add(retryDuration))
+        //        {
+        //            bool connected = await ConnectToSignalRServer();
+        //            if (connected)
+        //                return;
+        //        }
+        //        Console.WriteLine("Connection closed")
+        //    }
+        //}
         private void updateTopic(Future future)
         {
-            
+            try
+            {
+
+
                 Console.WriteLine("Future update for {0} new price {1}", future.Symbol, future.LastPrice);
                 foreach (var topic in _topics)
                 {
@@ -316,7 +377,12 @@ namespace RtdClock_ExcelRtdServer
                 //    }
                 //}
 
-            
+            }
+            catch (Exception ex)
+            {
+
+                Console.WriteLine("Error invoking GetAllStocks: {0}", ex.Message);
+            }
         }
 
         public static T? ConvertTo<T>(object x) where T : struct
