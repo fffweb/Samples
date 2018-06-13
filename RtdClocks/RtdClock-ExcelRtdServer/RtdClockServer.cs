@@ -87,7 +87,7 @@ namespace RtdClock_ExcelRtdServer
                 try
                 {
                     _urlServer = topic1._type;
-                    var task = getCtpticks(topic1._type);
+                    var task = connectToSignalServer(topic1._type);
                     task.Wait();
                 }
                 catch (Exception e)
@@ -206,7 +206,7 @@ namespace RtdClock_ExcelRtdServer
                     return false;
             }
         }
-        public async Task<bool> getCtpticks(string url)
+        public async Task<bool> connectToSignalServer(string url)
         {
             bool connected=false;
             try
@@ -241,7 +241,7 @@ namespace RtdClock_ExcelRtdServer
 
                             while (DateTime.UtcNow < DateTime.UtcNow.Add(retryDuration))
                             {
-                                bool connected1 = await getCtpticks(_urlServer);
+                                bool connected1 = await connectToSignalServer(_urlServer);
                                 if (connected1)
                                     return;
                             }
