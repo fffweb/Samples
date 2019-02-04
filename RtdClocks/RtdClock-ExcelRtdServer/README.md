@@ -1,4 +1,6 @@
-﻿This project has the following NuGet package installed:
+﻿1, need to defin server
+2, get last
+This project has the following NuGet package installed:
 * ExcelDna.AddIn
 
 The add-in defines:

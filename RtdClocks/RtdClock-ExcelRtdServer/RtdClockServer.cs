@@ -219,6 +219,8 @@ namespace RtdClock_ExcelRtdServer
  
 
                 IHubProxy stockTickerHubProxy = _hubConnection.CreateHubProxy("ctpQuantTicker");
+                //TODO: use RX
+                //stockTickerHubProxy.Observe()
                 stockTickerHubProxy.On<Future>("UpdateFuturePrice", updateTopic);
                 await _hubConnection.Start();
                 if (_hubConnection.State == ConnectionState.Connected)
@@ -319,6 +321,21 @@ namespace RtdClock_ExcelRtdServer
                         //if (!(Convert.ToDecimal(topic.Value) == future.LastPrice))
                         {
                             topic.UpdateValue(future.PreSettlementPrice);
+                        }
+                        if (topic._type == "UpdateTime" &&  Convert.ToString(topic.Value)!= future.UpdateTime)
+                        //if (!(Convert.ToDecimal(topic.Value) == future.LastPrice))
+                        {
+                            topic.UpdateValue(future.UpdateTime);
+                        }
+                        if (topic._type == "UpperLimit" && !(IsNumericType(topic.Value.GetType()) && Convert.ToDecimal(topic.Value) == future.UpperLimitPrice))
+                        //if (!(Convert.ToDecimal(topic.Value) == future.LastPrice))
+                        {
+                            topic.UpdateValue(future.UpperLimitPrice);
+                        }
+                        if (topic._type == "LowerLimit" && !(IsNumericType(topic.Value.GetType()) && Convert.ToDecimal(topic.Value) == future.LowerLimitPrice))
+                        //if (!(Convert.ToDecimal(topic.Value) == future.LastPrice))
+                        {
+                            topic.UpdateValue(future.LowerLimitPrice);
                         }
                     }
 
